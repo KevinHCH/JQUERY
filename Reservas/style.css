@@ -69,3 +69,12 @@ main table>tbody>tr:last-of-type{
 main table>tbody>tr:last-of-type{
     border-bottom-left-radius: 8px;
 }
+
+/* #tabs ul li a.active{
+    background-color: #e8e2d4;
+} */
+
+.activo{
+    color:red;
+    /* background-color: #e8e2d4; */
+}

@@ -8,13 +8,21 @@
     <title>Reservas de vuelos</title>
 
     <link rel="stylesheet" href="./style.css">
+    <script src="https://code.jquery.com/jquery-3.3.1.js" crossorigin="anonymous"></script>
 </head>
 
 <body>
     <main>
         <h2>Selecciona un viaje</h2>
         <section id="tabs">
-            <ul>
+            <div id="error" style="display:none;">
+                <h2>Ups, no se ha recibido los vuelos.</h2>
+                <p>Lo sentimos, <a href="#">Pulsa aqui</a> para reintentarlo</p>
+            </div>
+            <div id="cargando" style="display:none;">
+                <h2>Un momento mientras se cargan los datos del vuelo.</h2>
+            </div>
+            <!-- <ul>
                 <li><a href="2018/11/27" data-vuelos=4>27 Nov</a></li>
                 <li><a href="2018/11/28" data-vuelos=5>28 Nov</a></li>
                 <li><a href="2018/11/29" data-vuelos=1>29 Nov</a></li>
@@ -35,9 +43,120 @@
                 <tbody>
 
                 </tbody>
-            </table>
+            </table> -->
         </section>
     </main>
+    <script>
+        //Hacer esto es equivalente la DOMContentLoaded
+        $(() => {
+            //    Estructura del HTML
+            crearEstructura();
+
+            //    Eventos
+            // Esta es la forma mala
+            // $('#tabs ul li a').click(cambiarTab)
+            //                   .mouseenter(mostrarTooltip)
+            //                   .mouseout(ocultarTooltip);
+            
+            // Con el evento ON, te olvidas de definir el evento en concreto
+            // En JQ es malo poner cada evento a cada elemento por que en este caso se crearan 15 eventos
+            // $('#tabs ul li a').on({
+            //     'click' : cambiarTab,
+            //     'mouseenter' : mostrarTooltip,
+            //     'mouseout' : ocultarTooltip
+            // });
+
+            // El gestor es el tab, y estara a la escucha cuando se pulse
+            // a un element a
+            $('#tabs ul').on('click', 'li a', cambiarTab);
+
+            $('#tabs ul li:eq(2) a').click();
+        });
+        function cambiarTab(e) {
+            e.preventDefault();
+            $('#tabs ul li a.activo').removeClass('activo');
+            $(this).addClass('activo');
+
+            mostrarVuelos($(this).attr('href'));
+
+            // $('#tabs ul li a.activo').toggle('activo');
+        }
+        function mostrarTooltip(e) {
+            let tt = $(this).data('tooltip');
+            $(this).append('<span class="tooltip">' + tt + '</span>');
+            // $('#tabs span.tooltip').show();
+        }
+        function ocultarTooltip(e) {
+            $('#tabs span.tooltip').remove();
+        }
+        function mostrarVuelos(dia) {
+            $('#tabs div').hide();
+            pedirDatos(dia);
+            $(dia).show();
+        }
+        
+
+        function pedirDatos(dia) {
+            
+        }
+        function crearEstructura() {
+            const dias = [
+                '2018/11/27',
+                '2018/11/28',
+                '2018/11/29',
+                '2018/11/30',
+                '2018/12/01'
+            ];
+
+            
+            // Ambos elementos pueden crear elementos
+            // -Prepend: Ponme el elemento que te diga como el primer hijo por encima del resto
+            // -Append: Ponme el elemento como ultimo hijo
+            // -After: Ponlo al lado del elemento (Para poner hermanos)
+
+            // Localiza el ID y añade las tabulaciones
+            // En esta parte de crean los elementos y se van poniendo los elementos
+            // en el momento en que se crean como hermanos
+            $('#tabs').prepend(crearTabs(dias));
+            $('#tabs ul').after('<div id="billetes">');
+            $('#tabs div:first-of-type').after(crearDivs(dias));
+            
+        }//crearElemento
+
+        function crearTabs(dias) {
+            return `
+            <ul>
+                ${dias.map(dia => `
+                    <li> 
+                        <a href="#${dia}">${new Date(dia).toLocaleDateString('es', {day: '2-digit', month:'short'})}</a>
+                    </li>`).join('')}
+            </ul>
+            `;
+        }//crearTabs
+
+        function crearDivs(dias) {
+            return `${dias.map(dia => `
+                <div id="${dia}" style="display:none;">
+                    <table id="vuelos">
+                        <thead>
+                            <tr>
+                                <th>Salida</th>
+                                <th>Llegada</th>
+                                <th>Vuelo #</th>
+                                <th>Escalas</th>
+                                <th>Primera</th>
+                                <th>Económica</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>`).join('')}`;
+        }//crearDivs
+    </script>
 </body>
 
 </html>
+
+
+
