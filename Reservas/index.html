@@ -7,8 +7,10 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Reservas de vuelos</title>
 
-    <link rel="stylesheet" href="./style.css">
+    <!-- <link rel="stylesheet" href="./style.css"> -->
+    <link rel="stylesheet" href="./estilos.css">
     <script src="https://code.jquery.com/jquery-3.3.1.js" crossorigin="anonymous"></script>
+    <script src="../jquery.tmpl.js" crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -21,32 +23,30 @@
             </div>
             <div id="cargando" style="display:none;">
                 <h2>Un momento mientras se cargan los datos del vuelo.</h2>
+                <img src="loading.gif" alt="cargando">
             </div>
-            <!-- <ul>
-                <li><a href="2018/11/27" data-vuelos=4>27 Nov</a></li>
-                <li><a href="2018/11/28" data-vuelos=5>28 Nov</a></li>
-                <li><a href="2018/11/29" data-vuelos=1>29 Nov</a></li>
-                <li><a href="2018/11/30" data-vuelos=3>30 Nov</a></li>
-                <li><a href="2018/12/01" data-vuelos=2>01 Dic</a></li>
-            </ul>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Salida</th>
-                        <th>Llegada</th>
-                        <th>Vuelo #</th>
-                        <th>Escalas</th>
-                        <th>Primera</th>
-                        <th>Económica</th>
-                    </tr>
-                </thead>
-                <tbody>
-
-                </tbody>
-            </table> -->
         </section>
     </main>
+    <script id="tablaTmpl" type="text/x-jquery-tmpl">
+        <tr>
+            <td> ${salida} </td>
+            <td> ${llegada} </td>
+            <td> ${vuelo} </td>
+            <td> 
+                {{if (escalas == 0)}}
+                    Ninguna
+                {{else (escalas == 1)}}
+                    1 Escala
+                {{else}}
+                    ${escalas} Escalas.
+                {{/if}}
+            </td>
+            <td> ${primera} </td>
+            <td> ${economica} </td>
+        </tr>
+    </script>
     <script>
+        let pidiendoVuelos = null;
         //Hacer esto es equivalente la DOMContentLoaded
         $(() => {
             //    Estructura del HTML
@@ -61,20 +61,32 @@
             // Con el evento ON, te olvidas de definir el evento en concreto
             // En JQ es malo poner cada evento a cada elemento por que en este caso se crearan 15 eventos
             // $('#tabs ul li a').on({
-            //     'click' : cambiarTab,
-            //     'mouseenter' : mostrarTooltip,
-            //     'mouseout' : ocultarTooltip
-            // });
+            //     click : cambiarTab,
+            //     mouseenter : mostrarTooltip,
+            //     mouseout : ocultarTooltip
+            // },'a');
 
             // El gestor es el tab, y estara a la escucha cuando se pulse
             // a un element a
-            $('#tabs ul').on('click', 'li a', cambiarTab);
+            // $('#tabs ul').on('click', 'li a', cambiarTab);
 
-            $('#tabs ul li:eq(2) a').click();
+            $('#tabs ul li a').on({
+                click : cambiarTab,
+                mouseenter : mostrarTooltip,
+                mouseout : ocultarTooltip
+            });
+            $('#error a').click(function(e){
+                e.preventDefault();
+                mostrarVuelos($('#tabs li  a.activo').attr('href'))
+            });
+            
+            $('#tabs ul li:eq(0) a').click();
         });
         function cambiarTab(e) {
             e.preventDefault();
-            $('#tabs ul li a.activo').removeClass('activo');
+            // Evita que haga mas peticiones al server con los mimos datos
+            if($(this).hasClass('activo')) return;
+            $('#tabs li a.activo').removeClass('activo');
             $(this).addClass('activo');
 
             mostrarVuelos($(this).attr('href'));
@@ -82,9 +94,10 @@
             // $('#tabs ul li a.activo').toggle('activo');
         }
         function mostrarTooltip(e) {
+            
             let tt = $(this).data('tooltip');
             $(this).append('<span class="tooltip">' + tt + '</span>');
-            // $('#tabs span.tooltip').show();
+            $('#tabs span.tooltip').show();
         }
         function ocultarTooltip(e) {
             $('#tabs span.tooltip').remove();
@@ -97,15 +110,44 @@
         
 
         function pedirDatos(dia) {
-            
+            if (pidiendoVuelos) {
+                pidiendoVuelos.abort();
+            }
+            pidiendoVuelos = $.ajax({
+                url : "http://192.168.14.101:3000/vuelos",
+                data : {'fecha' : dia.substr(1)},
+                dataType : 'JSON',
+                cache : false,
+                timeout : 5*1000,
+                
+                beforeSend : function (res){$('#cargando').show();},
+                complete : function (res){$('#cargando').hide();},
+                                
+                success : function(res) {
+                    const html = $('#tablaTmpl').tmpl(res[0].vuelos);
+                    $(dia + ' tbody').html(html);
+                    const numVuelos = res[0].vuelos.length;
+                    const tt = (numVuelos>1)?' vuelos':' vuelo';
+                    
+                    $('[href="'+dia+'"').attr({
+                        'data-vuelos':numVuelos,
+                        'data-tooltip':numVuelos+tt})
+                        .mouseleave().mouseenter();
+                    
+                },
+                error : function(xhr) {
+                    if (xhr.statusText == 'abort') return;
+                    $('#error').show();
+                }
+            });
         }
         function crearEstructura() {
             const dias = [
-                '2018/11/27',
-                '2018/11/28',
-                '2018/11/29',
-                '2018/11/30',
-                '2018/12/01'
+                '2018-11-27',
+                '2018-11-28',
+                '2018-11-29',
+                '2018-11-30',
+                '2018-12-01'
             ];
 
             
@@ -128,7 +170,7 @@
             <ul>
                 ${dias.map(dia => `
                     <li> 
-                        <a href="#${dia}">${new Date(dia).toLocaleDateString('es', {day: '2-digit', month:'short'})}</a>
+                        <a href="#${dia}"> ${new Date(dia).toLocaleDateString('es', {day: '2-digit', month:'short'})}</a>
                     </li>`).join('')}
             </ul>
             `;
