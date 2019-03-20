@@ -15,7 +15,16 @@
 
 <body>
     <main>
-        <h2>Selecciona un viaje</h2>
+        <header>
+            <h1>Selecciona un viaje</h1>
+            <img src="filter.svg" alt="filtro">
+            <div id="filtro-escalas" style="display: none;">
+                <strong>Número de escalas</strong><br>
+                <label for=""><input type="radio" name="escalas" value="0">Niguna</label><br>
+                <label for=""><input type="radio" name="escalas" value="1">0-1</label><br>
+                <label for=""><input type="radio" name="escalas" value="2+" checked>0-2+</label><br>
+            </div>
+        </header>
         <section id="tabs">
             <div id="error" style="display:none;">
                 <h2>Ups, no se ha recibido los vuelos.</h2>
@@ -41,12 +50,27 @@
                     ${escalas} Escalas.
                 {{/if}}
             </td>
-            <td> ${primera} </td>
-            <td> ${economica} </td>
+            <td> <a href='#'' data-vuelo=${vuelo} data-clase='primera'>${primera} </a> </td>
+            <td> <a href='#'' data-vuelo=${vuelo} data-clase='economica'>${economica} </a> </td>
         </tr>
     </script>
     <script>
         let pidiendoVuelos = null;
+        let vuelosActuales = null;
+        $.filtrarVuelos = (vuelos, filtro) => {
+            const filtrados = [];
+
+            $.each(vuelos, (inx, vuelo) => {
+                if (filtro == '2+') {
+                    filtrados.push(vuelo);
+                } else if (filtro == '1' && vuelo.escalas <= 1) {
+                    filtrados.push(vuelo);
+                } else if (filtro == '0' && vuelo.escalas == 0) {
+                    filtrados.push(vuelo);
+                }
+            });
+            return filtrados;
+        };
         //Hacer esto es equivalente la DOMContentLoaded
         $(() => {
             //    Estructura del HTML
@@ -57,7 +81,7 @@
             // $('#tabs ul li a').click(cambiarTab)
             //                   .mouseenter(mostrarTooltip)
             //                   .mouseout(ocultarTooltip);
-            
+
             // Con el evento ON, te olvidas de definir el evento en concreto
             // En JQ es malo poner cada evento a cada elemento por que en este caso se crearan 15 eventos
             // $('#tabs ul li a').on({
@@ -71,21 +95,36 @@
             // $('#tabs ul').on('click', 'li a', cambiarTab);
 
             $('#tabs ul li a').on({
-                click : cambiarTab,
-                mouseenter : mostrarTooltip,
-                mouseout : ocultarTooltip
+                click: cambiarTab,
+                mouseenter: mostrarTooltip,
+                mouseout: ocultarTooltip
             });
-            $('#error a').click(function(e){
+            $('#error a').click(function (e) {
                 e.preventDefault();
                 mostrarVuelos($('#tabs li  a.activo').attr('href'))
             });
-            
+
+
+            // Pulsar sobre precios
+            $('#vuelos tbody').on('click', 'td a', infoVuelo);
+
+            $('header img').click((e) => {
+                $('header img').next().toggle();
+            });
+
+            $('#confirmar button').click((e) => {
+                $(this).parent().hide();
+            });
+            $('#filtro-escalas').on('change', 'input[name="escalas"]', filtrarVuelos);
+            // Esto esta por defecto
             $('#tabs ul li:eq(0) a').click();
+
         });
         function cambiarTab(e) {
             e.preventDefault();
-            // Evita que haga mas peticiones al server con los mimos datos
-            if($(this).hasClass('activo')) return;
+            // Evita que haga mas peticiones al server con los mismos datos
+            if ($(this).hasClass('activo')) return;
+
             $('#tabs li a.activo').removeClass('activo');
             $(this).addClass('activo');
 
@@ -94,53 +133,114 @@
             // $('#tabs ul li a.activo').toggle('activo');
         }
         function mostrarTooltip(e) {
-            
+
             let tt = $(this).data('tooltip');
-            $(this).append('<span class="tooltip">' + tt + '</span>');
-            $('#tabs span.tooltip').show();
+            $(this).append('<span class="tooltip">' + tt + '</span>')
+                .hide()
+                .fadeIn(200)
+                .animate({ marginTop: '4px' });
+
+            // const etiqueta = $('<span class="tooltip">' + tt + '</span>');
+            // etiqueta.css('opacity','0').appendTo($(this)).delay(200).animate({'opacity':'1', top: '-30px'}, 250)
+
+            // $('#tabs span.tooltip').show();
         }
+        function infoVuelo(e) {
+            e.preventDefault();
+            $('#vuelos tbody td a.seleccionado').removeClass('seleccionado');
+            $(this).toggleClass('seleccionado');
+
+            $('#confirmar').hide();
+
+            const precio = parseFloat($(this).text());
+            $.getJSON('http://192.168.14.101:3000/tasas', { 'vuelo': $(this).attr('data-vuelo') }, (res) => {
+                const total = precio + parseFloat(res[0].tasas);
+                $('#precio').text(precio);
+                $('#tasas').text(res[0].tasas);
+                $('#total').text(total + '€');
+
+                $('#confirmar').show(200);
+            });
+        }
+        function tablaTotales() {
+            return `
+            <div class="confirmar">
+                <table>
+                    <tbody>
+                        <tr>
+                            <th>Precio vuelo:</th><td id="precio"></td>
+                        </tr>
+                        <tr>
+                            <th>Tasas vuelo:</th><td id="tasas"></td>
+                        </tr>
+                        <tr class="total">
+                            <th>Total vuelo:</th><td id="total"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            `;
+        }//talaTotales
         function ocultarTooltip(e) {
+            $('#tabs span.tooltip').fadeOut(1000, () => {
+                return this.remove();
+            });
             $('#tabs span.tooltip').remove();
-        }
+        }//ocultarTooltip
         function mostrarVuelos(dia) {
             $('#tabs div').hide();
             pedirDatos(dia);
             $(dia).show();
-        }
-        
+        }//mostrarVuelos
 
+        function filtrarVuelos(e) {
+            const valor = $(this).val();
+            const vuelosFiltrados = $.filtrarVuelos(vuelosActuales, valor);
+            $('#tabs div:visible tbody tr').remove();
+            $('#tablaTmpl').tmpl(vuelosFiltrados).appendTo('#tabs div:visible tbody')
+        }
         function pedirDatos(dia) {
             if (pidiendoVuelos) {
                 pidiendoVuelos.abort();
             }
             pidiendoVuelos = $.ajax({
-                url : "http://192.168.14.101:3000/vuelos",
-                data : {'fecha' : dia.substr(1)},
-                dataType : 'JSON',
-                cache : false,
-                timeout : 5*1000,
-                
-                beforeSend : function (res){$('#cargando').show();},
-                complete : function (res){$('#cargando').hide();},
-                                
-                success : function(res) {
-                    const html = $('#tablaTmpl').tmpl(res[0].vuelos);
+                url: "http://192.168.14.101:3000/vuelos",
+                data: { 'fecha': dia.substr(1) },
+                dataType: 'JSON',
+                cache: false,
+                timeout: 5 * 1000,
+
+                beforeSend: function (res) { $('#cargando').show(); },
+                complete: function (res) { $('#cargando').hide(); },
+
+                success: function (res) {
+                    vuelosActuales = res[0].vuelos;
+
+                    // Filtrado
+                    const valorFiltro = $('#filtro-escalas input[name="escalas"]:checked').val();
+                    const vuelosFiltrados = $.filtrarVuelos(vuelosActuales, valorFiltro);
+
+                    // Creacion de la tabla
+                    const html = $('#tablaTmpl').tmpl(vuelosFiltrados);
                     $(dia + ' tbody').html(html);
-                    const numVuelos = res[0].vuelos.length;
-                    const tt = (numVuelos>1)?' vuelos':' vuelo';
-                    
-                    $('[href="'+dia+'"').attr({
-                        'data-vuelos':numVuelos,
-                        'data-tooltip':numVuelos+tt})
+                    const numVuelos = vuelosFiltrados.length;
+                    // Tooltip
+                    const tt = (numVuelos > 1) ? ' vuelos' : ' vuelo';
+
+
+                    $('[href="' + dia + '"').attr({
+                        'data-vuelos': numVuelos,
+                        'data-tooltip': numVuelos + tt
+                    })
                         .mouseleave().mouseenter();
-                    
+
                 },
-                error : function(xhr) {
+                error: function (xhr) {
                     if (xhr.statusText == 'abort') return;
                     $('#error').show();
                 }
             });
-        }
+        }//pedirDatos
         function crearEstructura() {
             const dias = [
                 '2018-11-27',
@@ -150,7 +250,7 @@
                 '2018-12-01'
             ];
 
-            
+
             // Ambos elementos pueden crear elementos
             // -Prepend: Ponme el elemento que te diga como el primer hijo por encima del resto
             // -Append: Ponme el elemento como ultimo hijo
@@ -162,15 +262,18 @@
             $('#tabs').prepend(crearTabs(dias));
             $('#tabs ul').after('<div id="billetes">');
             $('#tabs div:first-of-type').after(crearDivs(dias));
-            
-        }//crearElemento
+
+            $('#tabs').after('<section id="confirmar">')
+            $('#confirmar').append(tablaTotales());
+            $('#confirmar').append('<button>Confirmar </button>');
+        }//crearEstructura
 
         function crearTabs(dias) {
             return `
             <ul>
                 ${dias.map(dia => `
                     <li> 
-                        <a href="#${dia}"> ${new Date(dia).toLocaleDateString('es', {day: '2-digit', month:'short'})}</a>
+                        <a href="#${dia}"> ${new Date(dia).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</a>
                     </li>`).join('')}
             </ul>
             `;
@@ -199,6 +302,3 @@
 </body>
 
 </html>
-
-
-
